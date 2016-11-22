@@ -5,8 +5,6 @@ import android.widget.EditText;
 
 import rx.Observer;
 
-import static android.R.attr.enabled;
-
 public class RxEditText {
 
     public static Observer<Boolean> enabled(final EditText editText) {

@@ -5,8 +5,6 @@ import android.support.design.widget.Snackbar;
 
 import rx.Observer;
 
-import static android.R.attr.visible;
-
 public class RxSnackbar {
 
     public static Observer<String> text(final Snackbar snackbar) {

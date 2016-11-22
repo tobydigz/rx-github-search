@@ -3,8 +3,6 @@ package ng.gdg.devfestsw.rxgithubsearch.rx;
 import android.support.v7.widget.RecyclerView;
 import rx.Observer;
 
-import static android.R.attr.enabled;
-
 public class RxRecyclerView {
 
     public static Observer<Boolean> enabled(final RecyclerView recyclerView) {
