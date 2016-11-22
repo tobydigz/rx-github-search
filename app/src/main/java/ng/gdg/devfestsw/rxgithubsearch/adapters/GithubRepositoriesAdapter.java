@@ -50,6 +50,11 @@ public class GithubRepositoriesAdapter extends RecyclerView.Adapter<GithubReposi
         this.notifyDataSetChanged();
     }
 
+    public void clearRepositories() {
+        this.repositories.clear();
+        this.notifyDataSetChanged();
+    }
+
     class ViewHolder extends RecyclerView.ViewHolder {
 
         private TextView nameTextView;

@@ -11,6 +11,7 @@ import android.widget.TextView;
 
 import com.jakewharton.rxbinding.support.v7.widget.RecyclerViewScrollEvent;
 import com.jakewharton.rxbinding.support.v7.widget.RxRecyclerView;
+import com.jakewharton.rxbinding.support.v7.widget.RxRecyclerViewAdapter;
 import com.jakewharton.rxbinding.view.RxView;
 import com.jakewharton.rxbinding.widget.RxTextView;
 import com.jakewharton.rxbinding.widget.TextViewAfterTextChangeEvent;
@@ -21,12 +22,15 @@ import java.util.concurrent.TimeUnit;
 import ng.gdg.devfestsw.rxgithubsearch.R;
 import ng.gdg.devfestsw.rxgithubsearch.adapters.GithubRepositoriesAdapter;
 import ng.gdg.devfestsw.rxgithubsearch.models.GithubRepository;
+import ng.gdg.devfestsw.rxgithubsearch.rx.RxEditText;
+import ng.gdg.devfestsw.rxgithubsearch.rx.RxSnackbar;
 import ng.gdg.devfestsw.rxgithubsearch.viewmodels.MainActivityViewModel;
 import rx.Observable;
 import rx.Subscription;
 import rx.android.schedulers.AndroidSchedulers;
 import rx.functions.Action1;
 import rx.functions.Func1;
+import rx.functions.Func2;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -54,7 +58,7 @@ public class MainActivity extends AppCompatActivity {
         setupViews();
         setupSubscriptions();
     }
-
+    
     private void setupSubscriptions() {
         RxTextView.afterTextChangeEvents(searchEditText)
                 .map(new Func1<TextViewAfterTextChangeEvent, Boolean>() {
@@ -63,7 +67,7 @@ public class MainActivity extends AppCompatActivity {
                         return true;
                     }
                 })
-                .subscribe(viewModel.isSearching);
+                .subscribe(viewModel.searching);
 
         RxTextView.afterTextChangeEvents(searchEditText)
                 .debounce(THROTTLE_DELAY, TimeUnit.MILLISECONDS)
@@ -71,12 +75,6 @@ public class MainActivity extends AppCompatActivity {
                     @Override
                     public String call(TextViewAfterTextChangeEvent event) {
                         return event.editable().toString();
-                    }
-                })
-                .filter(new Func1<String, Boolean>() {
-                    @Override
-                    public Boolean call(String query) {
-                        return query != null && !(query.isEmpty());
                     }
                 })
                 .subscribe(viewModel.searchQuery);
@@ -93,86 +91,129 @@ public class MainActivity extends AppCompatActivity {
                 })
                 .subscribe(viewModel.nextPageRequested);
 
-        viewModel.isSearching
+        viewModel.searching
+                .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(RxView.visibility(searchProgressBar));
 
-        viewModel.isSearching
-                .map(new Func1<Boolean, Boolean>() {
+        viewModel.searching
+                .subscribe(new Action1<Boolean>() {
                     @Override
-                    public Boolean call(Boolean searching) {
-                        return !searching;
-                    }
-                })
-                .subscribe(RxView.visibility(repositoriesView));
-
-        viewModel.isSearching
-                .map(new Func1<Boolean, String>() {
-                    @Override
-                    public String call(Boolean searching) {
-                        return searching ? getResources().getString(R.string.searching) : null;
-                    }
-                })
-                .filter(new Func1<String, Boolean>() {
-                    @Override
-                    public Boolean call(String s) {
-                        return s != null && !(s.trim().isEmpty());
-                    }
-                })
-                .subscribe(RxTextView.text(repositoryCountTextView));
-
-        viewModel.isLoadingNextPage
-                .subscribe(RxView.visibility(loadNextPageProgressBar));
-
-        viewModel.repositories
-                .subscribe(new Action1<List<GithubRepository>>() {
-                    @Override
-                    public void call(List<GithubRepository> repositories) {
-                        adapter.setRepositories(repositories);
+                    public void call(Boolean searching) {
+                        if (searching) {
+                            adapter.clearRepositories();
+                        }
                     }
                 });
 
-        viewModel.repositoriesCount
-                .map(new Func1<Integer, String>() {
+        viewModel.repositoriesFetched
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(RxView.visibility(repositoriesView));
+
+        viewModel.repositoriesFetched
+                .observeOn(AndroidSchedulers.mainThread())
+                .map(new Func1<Boolean, Boolean>() {
                     @Override
-                    public String call(Integer count) {
-                        return count == 0 ? getResources().getString(R.string.no_repository_found) : getResources().getString(R.string.repositories_found, count, count > 1 ? "ies" : "y");
+                    public Boolean call(Boolean fetched) {
+                        return !fetched;
+                    }
+                })
+                .subscribe(RxView.visibility(searchProgressBar));
+
+        viewModel.repositoriesFetched
+                .observeOn(AndroidSchedulers.mainThread())
+                .map(new Func1<Boolean, Boolean>() {
+                    @Override
+                    public Boolean call(Boolean fetched) {
+                        return !fetched;
+                    }
+                })
+                .subscribe(RxView.visibility(loadNextPageProgressBar));
+
+        viewModel.nextPageRequested
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(RxView.visibility(loadNextPageProgressBar));
+
+        viewModel.repositories
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(
+                    new Action1<List<GithubRepository>>() {
+                        @Override
+                        public void call(List<GithubRepository> repositories) {
+                            adapter.addRepositories(repositories);
+                        }
+                    }
+                );
+
+        viewModel.searching
+                .observeOn(AndroidSchedulers.mainThread())
+                .map(new Func1<Boolean, String>() {
+                    @Override
+                    public String call(Boolean searching) {
+                        return getResources().getString(R.string.searching);
                     }
                 })
                 .subscribe(RxTextView.text(repositoryCountTextView));
 
+        RxRecyclerViewAdapter.dataChanges(adapter)
+            .map(new Func1<GithubRepositoriesAdapter, String>() {
+                @Override
+                public String call(GithubRepositoriesAdapter adapter) {
+                    int count = adapter.getItemCount();
+
+                    return count == 0 ? getResources().getString(R.string.no_repository_found)
+                            : getResources().getString(R.string.repositories_found, count, count > 1 ? "ies" : "y");
+                    }
+                })
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(RxTextView.text(repositoryCountTextView));
+
         viewModel.rateLimitExceeded
-                .subscribe(new Action1<Boolean>() {
+                .subscribe(RxSnackbar.visible(rateLimitExceededSnackbar));
+
+        viewModel.rateLimitExceeded
+                .subscribe(RxEditText.disabled(searchEditText));
+
+        viewModel.rateLimitExceeded
+                .subscribe(ng.gdg.devfestsw.rxgithubsearch.rx.RxRecyclerView.disabled(repositoriesView));
+
+        viewModel.rateLimitExceeded
+                .filter(new Func1<Boolean, Boolean>() {
                     @Override
-                    public void call(final Boolean rateLimitExceeded) {
-                        rateLimitExceededSnackbar.setText(getResources().getString(R.string.rate_limit_exceeded, 60, "s"));
-                        rateLimitExceededSnackbar.show();
-
-                        searchEditText.setEnabled(false);
-                        repositoriesView.setLayoutFrozen(true);
-
-                        rateLimitExceededWaitSubscription = Observable.interval(1, TimeUnit.SECONDS)
-                                .observeOn(AndroidSchedulers.mainThread())
-                                .subscribe(new Action1<Long>() {
+                    public Boolean call(Boolean exceeded) {
+                        return exceeded;
+                    }
+                })
+                .flatMap(new Func1<Boolean, Observable<Long>>() {
+                    @Override
+                    public Observable<Long> call(Boolean exceeded) {
+                        return Observable.zip(
+                                Observable.range(0, 60),
+                                Observable.interval(1, TimeUnit.SECONDS),
+                                new Func2<Integer, Long, Long>() {
                                     @Override
-                                    public void call(Long value) {
-                                        long seconds = 59 - value;
-
-                                        if (seconds > 0) {
-                                            rateLimitExceededSnackbar.setText(getResources().getString(R.string.rate_limit_exceeded, seconds, seconds > 1 ? "s" : ""));
-                                        } else {
-                                            rateLimitExceededSnackbar.dismiss();
-
-                                            searchEditText.setEnabled(true);
-                                            repositoriesView.setLayoutFrozen(false);
-
-                                            if (rateLimitExceededWaitSubscription != null && !(rateLimitExceededWaitSubscription.isUnsubscribed())) {
-                                                rateLimitExceededWaitSubscription.unsubscribe();
-                                            }
-                                        }
+                                    public Long call(Integer count, Long seconds) {
+                                        return 59L - count;
                                     }
-                                });
-                        }
-                    });
+                                }
+                        )
+                        .doOnNext(new Action1<Long>() {
+                            @Override
+                            public void call(Long seconds) {
+                                if (seconds == 0) {
+                                    viewModel.rateLimitExceeded.onNext(false);
+                                }
+                            }
+                        });
+                    }
+                })
+                .map(new Func1<Long, String>() {
+                    @Override
+                    public String call(Long seconds) {
+                        return getResources().getString(R.string.rate_limit_exceeded, seconds, seconds > 1 ? "s" : "");
+                    }
+                })
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(RxSnackbar.text(rateLimitExceededSnackbar));
     }
 
     private void setupViewModel() {
@@ -186,6 +227,7 @@ public class MainActivity extends AppCompatActivity {
         searchProgressBar = findViewById(R.id.search_progress_bar);
         loadNextPageProgressBar = findViewById(R.id.load_next_page_progress_bar);
         rateLimitExceededSnackbar = Snackbar.make(findViewById(R.id.activity_main), "", Snackbar.LENGTH_INDEFINITE);
+        rateLimitExceededSnackbar.setText(getResources().getString(R.string.rate_limit_exceeded, 60, "s"));
 
         adapter = new GithubRepositoriesAdapter();
         repositoriesView.setLayoutManager(new LinearLayoutManager(this));

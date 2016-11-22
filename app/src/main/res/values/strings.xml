@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Rx Github Search</string>
+    <string name="app_name">Github Search</string>
     <string name="search_text_field_hint">Search on Github</string>
     <string name="repository_count_text_view_placeholder">No repository found</string>
     <string name="no_repository_found">No repository found</string>

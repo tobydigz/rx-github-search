@@ -40,7 +40,10 @@ public class GithubSearchHttpService implements GithubSearchService {
     }
 
     public Observable<List<GithubRepository>> search(String query) {
-        return loadPage(URL + "?q=" + query);
+        if (query == null || query.isEmpty()) {
+            return Observable.just((List<GithubRepository>) new ArrayList<GithubRepository>());
+        }
+        return loadPage(URL + "?q=" + query.trim());
     }
 
     public Observable<List<GithubRepository>> loadNextPage() {
