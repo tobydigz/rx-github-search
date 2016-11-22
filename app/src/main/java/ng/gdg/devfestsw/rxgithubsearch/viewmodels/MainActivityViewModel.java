@@ -36,8 +36,8 @@ public class MainActivityViewModel {
                .subscribe(
                        new Action1<List<GithubRepository>>() {
                            @Override
-                           public void call(List<GithubRepository> repositories) {
-                               MainActivityViewModel.this.repositories.onNext(repositories);
+                           public void call(List<GithubRepository> repos) {
+                               repositories.onNext(repos);
                            }
                        },
                        new Action1<Throwable>() {
@@ -56,8 +56,8 @@ public class MainActivityViewModel {
                .subscribe(
                        new Action1<List<GithubRepository>>() {
                            @Override
-                           public void call(List<GithubRepository> nextRepositories) {
-                               MainActivityViewModel.this.repositories.onNext(nextRepositories);
+                           public void call(List<GithubRepository> repos) {
+                               repositories.onNext(repos);
                            }
                        },
                        new Action1<Throwable>() {
@@ -89,7 +89,7 @@ public class MainActivityViewModel {
                 .subscribe(new Action1<String>() {
                     @Override
                     public void call(String query) {
-                        MainActivityViewModel.this.search(query);
+                        search(query);
                     }
                 });
 
@@ -98,7 +98,7 @@ public class MainActivityViewModel {
                     @Override
                     public void call(Boolean load) {
                         if (load != null && load) {
-                            MainActivityViewModel.this.loadNextPage();
+                            loadNextPage();
                         }
                     }
                 });
